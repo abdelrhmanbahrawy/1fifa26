@@ -1,0 +1,637 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FIFA maZen AMR — Local League (Black & Silver)</title>
+<meta name="description" content="FIFA maZen AMR — Local league manager. LocalStorage, signup/login, teams, matches, standings. Dark black/silver theme with gray/blue light mode."/>
+<style>
+/* ======================================================
+   Black & Silver (dark) theme + Gray/Blue (light) mode
+   Select dropdowns: white background, black text, black border
+   Scrollbar uses only white & black.
+   ====================================================== */
+
+/* ---- Color variables (default = dark theme) ---- */
+:root{
+  --bg-1: #070707;
+  --bg-2: #131316;
+  --card: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));
+  --text: #e9eef6;
+  --muted: #9aa6b3;
+  --accent: #32b7ff;    /* electric blue accent */
+  --accent-2: #1a8bd6;
+  --glass: rgba(255,255,255,0.03);
+  --radius: 12px;
+  --shadow: 0 10px 30px rgba(0,0,0,0.7);
+  --pill-bg: rgba(255,255,255,0.03);
+}
+
+/* ---- Light mode overrides (gray/blue accent) ---- */
+body.light-mode{
+  --bg-1: #f0f4f8;
+  --bg-2: #e6eef8;
+  --card: linear-gradient(180deg, rgba(0,0,0,0.03), rgba(0,0,0,0.01));
+  --text: #091223;
+  --muted: #4a647a;
+  --accent: #3d7fbf; /* gray-blue accent */
+  --accent-2: #2f6ea8;
+  --glass: rgba(0,0,0,0.04);
+  --shadow: 0 8px 20px rgba(7,17,36,0.06);
+  --pill-bg: rgba(0,0,0,0.04);
+}
+
+/* ---- Base layout ---- */
+html,body{height:100%;margin:0;background:
+  radial-gradient(900px 500px at 12% 8%, rgba(50,183,255,0.02), transparent 6%),
+  linear-gradient(180deg,var(--bg-1),var(--bg-2));
+  color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  -webkit-font-smoothing:antialiased;-moz-osx-font-smoothing:grayscale;
+}
+.wrap{max-width:1100px;margin:18px auto;padding:14px}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.brand{display:flex;gap:12px;align-items:center}
+.logo-svg{height:52px;width:220px}
+h1{margin:0;font-size:18px;letter-spacing:0.5px}
+.muted{color:var(--muted);font-size:13px}
+.controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+button{background:linear-gradient(180deg,var(--accent), var(--accent-2));border:none;color:#fff;padding:9px 12px;border-radius:10px;cursor:pointer;font-weight:700;box-shadow:var(--shadow)}
+button.ghost{background:transparent;border:1px solid rgba(255,255,255,0.06);color:var(--muted);box-shadow:none}
+button.small{padding:6px 8px;font-size:13px;border-radius:8px}
+.card{background:var(--card);padding:14px;border-radius:var(--radius);box-shadow:var(--shadow);margin-top:12px}
+input,textarea{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit;width:100%;box-sizing:border-box}
+table{width:100%;border-collapse:collapse}
+th,td{padding:10px;border-bottom:1px solid rgba(255,255,255,0.03);text-align:left;font-size:14px}
+.team{display:flex;align-items:center;gap:10px}
+.logo-pill{width:46px;height:46px;border-radius:10px;background:var(--pill-bg);display:inline-flex;align-items:center;justify-content:center;font-weight:800;color:var(--accent)}
+.small{font-size:13px}
+.center{text-align:center}
+.right{text-align:right}
+.danger{background:#ef4444;color:#fff}
+.success{background:#10b981;color:#fff}
+.grid{display:grid;grid-template-columns:1fr 360px;gap:14px;align-items:start;margin-top:14px}
+.input-row{display:flex;gap:8px;align-items:center;margin-top:10px;flex-wrap:wrap}
+.pill{background:var(--pill-bg);padding:6px 10px;border-radius:999px;font-size:13px;color:var(--muted)}
+footer{margin-top:16px;color:var(--muted);font-size:13px;text-align:center}
+.muted-block{color:var(--muted);padding:10px;border-radius:10px;background:linear-gradient(180deg, rgba(255,255,255,0.01), transparent)}
+.auth-icons{display:flex;gap:6px;align-items:center}
+.icon-btn{background:transparent;border:none;padding:8px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer}
+.icon-btn svg{width:22px;height:22px;opacity:0.95}
+.icon-btn:hover{background:rgba(255,255,255,0.02)}
+@media (max-width:900px){
+  .grid{grid-template-columns:1fr;gap:12px}
+  .logo-svg{height:44px;width:180px}
+  header{gap:8px}
+}
+
+/* ---- Selected team pill style (black background, white text) ---- */
+.team-selected{
+  background:#000;color:#fff;padding:8px 12px;border-radius:999px;font-weight:800;border:2px solid rgba(255,255,255,0.06);
+}
+/* force black/white even in light mode */
+body.light-mode .team-selected{ background:#000;color:#fff; }
+
+/* ---- Scrollbar: white & black only ---- */
+/* WebKit browsers */
+::-webkit-scrollbar { width:12px; height:12px; }
+::-webkit-scrollbar-track { background: transparent; }
+html:not(.light-mode) ::-webkit-scrollbar-thumb { background:#ffffff; border-radius:999px; border:3px solid #000; } /* dark theme: white thumb, black border */
+html.light-mode ::-webkit-scrollbar-thumb { background:#000000; border-radius:999px; border:3px solid #ffffff; } /* light mode: black thumb, white border */
+
+/* Firefox (uses documentElement style set in JS) */
+* { scrollbar-width:thin; }
+
+/* ---- CUSTOM SELECT (white box, black text, black border) ---- */
+.select-wrapper{position:relative;display:inline-block}
+select.custom-select{
+  -webkit-appearance:none; -moz-appearance:none; appearance:none;
+  background:#ffffff; color:#000000; border:1px solid #000000;
+  border-radius:10px; padding:8px 34px 8px 10px; font-size:14px; min-width:140px;
+  box-sizing:border-box;
+}
+/* ensure options show black text on white background where possible */
+select.custom-select option{ color:#000000; background:#ffffff; }
+
+/* custom arrow (black) */
+.select-wrapper::after{
+  content:"";
+  position:absolute;
+  right:10px;
+  top:50%;
+  transform:translateY(-50%);
+  width:0;height:0;
+  border-left:6px solid transparent;
+  border-right:6px solid transparent;
+  border-top:6px solid #000;
+  pointer-events:none;
+}
+
+/* Focus state */
+select.custom-select:focus{ outline:none; box-shadow:0 4px 14px rgba(0,0,0,0.12); }
+
+/* small helper accessibility */
+.visually-hidden{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;}
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="brand" aria-hidden="false">
+        <!-- Modern metallic sporty logo (FIFA maZen AMR) -->
+        <svg class="logo-svg" viewBox="0 0 520 140" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <defs>
+            <linearGradient id="metalA" x1="0" x2="1"><stop offset="0" stop-color="#f3f6f9"/><stop offset="1" stop-color="#c9d6e8"/></linearGradient>
+            <linearGradient id="blueA" x1="0" x2="1"><stop offset="0" stop-color="#5fd3ff"/><stop offset="1" stop-color="#2aa0e6"/></linearGradient>
+            <filter id="drop" x="-50%" y="-50%" width="200%" height="200%"><feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#000" flood-opacity="0.45"/></filter>
+          </defs>
+
+          <rect x="0" y="12" width="520" height="96" rx="18" fill="rgba(255,255,255,0.02)"/>
+          <path d="M0 92 L140 26 L420 26 L520 92 L520 110 L0 110 Z" fill="url(#blueA)" opacity="0.06"/>
+          <g transform="translate(14,18)">
+            <rect x="0" y="0" width="260" height="82" rx="10" fill="#0b0b0d" stroke="rgba(255,255,255,0.03)"/>
+            <text x="12" y="28" font-family="Inter,Arial" font-weight="800" font-size="22" fill="url(#metalA)">FIFA</text>
+            <text x="12" y="60" font-family="Inter,Arial" font-weight="900" font-size="36" fill="url(#blueA)" filter="url(#drop)">maZen</text>
+            <text x="150" y="60" font-family="Inter,Arial" font-weight="900" font-size="24" fill="#cbdff6">AMR</text>
+          </g>
+
+          <g transform="translate(295,26)">
+            <rect x="0" y="0" width="160" height="68" rx="10" fill="#0b0d10" />
+            <circle cx="34" cy="34" r="24" fill="#fff"/>
+            <path d="M34 19 L39 28 L34 36 L29 28 Z" fill="#000"/>
+            <text x="70" y="44" font-family="Inter,Arial" font-weight="700" font-size="18" fill="#0b0d10">Pro</text>
+          </g>
+        </svg>
+
+        <div>
+          <h1>FIFA maZen AMR</h1>
+          <div class="muted small">Local league manager — stored in your browser</div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <!-- Theme toggle -->
+        <div id="themeToggle" class="icon-btn" title="Toggle theme" aria-label="Toggle theme">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4"><circle cx="12" cy="12" r="4"/></svg>
+        </div>
+
+        <!-- Auth icons -->
+        <div class="auth-icons" id="authIcons">
+          <button id="iconSignUp" class="icon-btn" title="Sign up">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/>
+              <circle cx="9" cy="7" r="4"/>
+              <path d="M20 8v6"/><path d="M23 11h-6"/>
+            </svg>
+          </button>
+
+          <button id="iconLogIn" class="icon-btn" title="Log in">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/>
+              <polyline points="10 17 15 12 10 7"/><path d="M15 12H3"/>
+            </svg>
+          </button>
+
+          <button id="iconLogout" class="icon-btn" title="Logout" style="display:none">
+            <svg viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+              <polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <main class="card" style="margin-top:14px">
+      <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="controls">
+          <button id="btnCreateLeague">Create League</button>
+          <button id="btnOpenLeague" class="ghost small">Open League</button>
+          <button id="btnMyLeagues" class="ghost small">My Leagues</button>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input id="searchInput" placeholder="Search team or match or user" style="min-width:180px" />
+          <span id="loggedAs" class="pill">Not signed in</span>
+        </div>
+      </div>
+
+      <div class="grid">
+        <section>
+          <div id="notice" class="muted-block small" style="margin-top:12px">Sign up and create or open a league to start. Date auto-fills to today when adding a match.</div>
+          <div id="mainContent"></div>
+        </section>
+
+        <aside>
+          <div class="card">
+            <h3 style="margin:0 0 8px 0">Profile</h3>
+            <div id="profilePanel" class="small muted-block">Not signed in</div>
+          </div>
+
+          <div class="card">
+            <h3 style="margin:0 0 8px 0">Quick Actions</h3>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <button id="btnAddTeamQuick" class="small ghost">Add Team (open league)</button>
+              <button id="btnAddMatchQuick" class="small ghost">Add Match (creator)</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <h3 style="margin:0 0 8px 0">About</h3>
+            <div class="muted small">FIFA maZen AMR — black & silver theme, gray/blue light mode. Data stored locally.</div>
+          </div>
+        </aside>
+      </div>
+    </main>
+
+    <footer>FIFA maZen AMR — local league manager. Data persists in this browser.</footer>
+  </div>
+
+<script>
+/* ===========================================================
+   Local league app JS
+   - Black/silver dark theme + gray/blue light mode (persisted)
+   - Username + password signup/login (SHA-256 hashed)
+   - No invites (creator-only leagues)
+   - Add match: choose teams from dropdowns (no typing)
+   - Date auto-fills to today by default but editable
+   - Team selection shows black & white pill
+   - Scrollbar is white & black only
+   - SELECTs use class "custom-select" to style white box + black text
+   =========================================================== */
+
+/* Storage keys */
+const LS_USERS = 'fifa26_users_black_silver_v1';
+const LS_LEAGUES = 'fifa26_leagues_black_silver_v1';
+const LS_TEAMS = 'fifa26_teams_black_silver_v1';
+const LS_MATCHES = 'fifa26_matches_black_silver_v1';
+const LS_CURRENT = 'fifa26_current_black_silver_v1';
+const LS_THEME = 'fifa26_theme_black_silver_v1';
+
+/* Helpers */
+const $ = id => document.getElementById(id);
+const uid = () => Math.random().toString(36).slice(2,9);
+async function sha256Hex(text){ const enc = new TextEncoder(); const data = enc.encode(text); const h = await crypto.subtle.digest('SHA-256', data); return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join(''); }
+function load(k, fallback){ try{ const s = localStorage.getItem(k); return s ? JSON.parse(s) : fallback; } catch(e){ return fallback; } }
+function save(k, v){ localStorage.setItem(k, JSON.stringify(v)); }
+
+/* Initialize storage if missing */
+if (!localStorage.getItem(LS_USERS)) save(LS_USERS, []);
+if (!localStorage.getItem(LS_LEAGUES)) save(LS_LEAGUES, []);
+if (!localStorage.getItem(LS_TEAMS)) save(LS_TEAMS, []);
+if (!localStorage.getItem(LS_MATCHES)) save(LS_MATCHES, []);
+if (!localStorage.getItem(LS_CURRENT)) save(LS_CURRENT, null);
+if (!localStorage.getItem(LS_THEME)) save(LS_THEME, 'dark');
+
+/* State */
+let users = load(LS_USERS, []);
+let leagues = load(LS_LEAGUES, []);
+let teams = load(LS_TEAMS, []);
+let matches = load(LS_MATCHES, []);
+let current = load(LS_CURRENT, null); // { username, openLeagueId }
+let theme = load(LS_THEME, 'dark');
+
+function persistAll(){ save(LS_USERS, users); save(LS_LEAGUES, leagues); save(LS_TEAMS, teams); save(LS_MATCHES, matches); save(LS_CURRENT, current); save(LS_THEME, theme); }
+
+/* Apply theme */
+function applyTheme(){ if (theme === 'light') document.body.classList.add('light-mode'); else document.body.classList.remove('light-mode'); updateScrollbarColors(); }
+function updateScrollbarColors(){
+  if (theme === 'light'){
+    document.documentElement.style.setProperty('scrollbar-color', 'black white');
+  } else {
+    document.documentElement.style.setProperty('scrollbar-color', 'white black');
+  }
+}
+applyTheme();
+
+/* UI Auth icons visibility */
+function updateAuthIcons(){
+  if (!current){
+    $('iconSignUp').style.display = 'inline-flex';
+    $('iconLogIn').style.display = 'inline-flex';
+    $('iconLogout').style.display = 'none';
+    $('loggedAs').textContent = 'Not signed in';
+  } else {
+    $('iconSignUp').style.display = 'none';
+    $('iconLogIn').style.display = 'none';
+    $('iconLogout').style.display = 'inline-flex';
+    $('loggedAs').textContent = current.username;
+  }
+}
+
+/* Utility: current league */
+function currentLeague(){ return current && current.openLeagueId ? leagues.find(l => l.id === current.openLeagueId) : null; }
+
+/* Compute standings */
+function computeStandings(leagueId){
+  const t = teams.filter(x=>x.leagueId === leagueId);
+  const map = {}; t.forEach(team => map[team.id] = { id: team.id, name: team.name, w:0,d:0,l:0,pts:0,gf:0,ga:0,gd:0 });
+  matches.filter(m => m.leagueId === leagueId && m.played).forEach(m => {
+    const h = map[m.homeId], a = map[m.awayId]; if (!h || !a) return;
+    h.gf += m.scoreHome; h.ga += m.scoreAway; a.gf += m.scoreAway; a.ga += m.scoreHome;
+    if (m.scoreHome > m.scoreAway){ h.w++; h.pts += 3; a.l++; }
+    else if (m.scoreHome < m.scoreAway){ a.w++; a.pts += 3; h.l++; }
+    else { h.d++; a.d++; h.pts++; a.pts++; }
+  });
+  const arr = Object.values(map); arr.forEach(x => x.gd = x.gf - x.ga);
+  arr.sort((A,B) => B.pts - A.pts || B.gd - A.gd || B.gf - A.gf || A.name.localeCompare(B.name));
+  return arr;
+}
+
+/* Renders */
+function renderAll(){
+  // reload state from storage (multi-tab friendly)
+  users = load(LS_USERS, users);
+  leagues = load(LS_LEAGUES, leagues);
+  teams = load(LS_TEAMS, teams);
+  matches = load(LS_MATCHES, matches);
+  current = load(LS_CURRENT, current);
+  theme = load(LS_THEME, theme);
+  applyTheme();
+  updateAuthIcons();
+  renderProfile();
+  renderContent();
+}
+
+/* Profile panel */
+function renderProfile(){
+  const p = $('profilePanel'); p.innerHTML = '';
+  if (!current){ p.innerHTML = '<div class="muted">Not signed in</div>'; return; }
+  const u = users.find(x=>x.username === current.username);
+  if (!u){ p.innerHTML = '<div class="muted">Profile missing</div>'; return; }
+  const el = document.createElement('div');
+  el.innerHTML = `<div><strong>${u.username}</strong></div><div class="muted small">Club: ${u.club || '—'}</div>`;
+  const btn = document.createElement('button'); btn.className='small ghost'; btn.textContent='Set Club'; btn.onclick = ()=>{ const c = prompt('Club name', u.club||''); if (c===null) return; u.club = c || null; persistAll(); renderAll(); };
+  el.appendChild(btn);
+  p.appendChild(el);
+}
+
+/* Main content */
+function renderContent(){
+  const main = $('mainContent'); main.innerHTML = '';
+  if (!current){
+    const c = document.createElement('div'); c.className='card'; c.innerHTML = `<h3>Welcome</h3><div class="muted small">Sign up and create a league to get started. Data is saved locally in this browser.</div>`; main.appendChild(c); return;
+  }
+
+  const l = currentLeague();
+  if (!l){
+    const card = document.createElement('div'); card.className='card';
+    card.innerHTML = `<h3>Your Leagues</h3>`;
+    const my = leagues.filter(le => le.creator === current.username);
+    if (!my.length) card.innerHTML += '<div class="muted small">You have not created any leagues yet.</div>';
+    my.forEach(le => {
+      const row = document.createElement('div'); row.style.display='flex'; row.style.justifyContent='space-between'; row.style.alignItems='center'; row.style.marginTop='8px';
+      row.innerHTML = `<div><strong>${le.title}</strong><div class="muted small">id: ${le.id}</div></div>`;
+      const open = document.createElement('button'); open.textContent = 'Open'; open.onclick = ()=>{ current.openLeagueId = le.id; save(LS_CURRENT, current); persistAll(); renderAll(); };
+      row.appendChild(open); card.appendChild(row);
+    });
+    main.appendChild(card);
+    return;
+  }
+
+  // League header
+  const headerCard = document.createElement('div'); headerCard.className='card';
+  headerCard.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><h3 style="margin:0">${l.title}</h3><div class="muted small">Creator: ${l.creator}</div></div><div><button id="btnCloseLeague" class="small ghost">Close</button></div></div>`;
+  main.appendChild(headerCard);
+
+  // Members (creator only)
+  const membersCard = document.createElement('div'); membersCard.className='card'; membersCard.style.marginTop='12px';
+  membersCard.innerHTML = `<h4 style="margin:0">Members</h4><div class="muted small">${l.creator}</div>`;
+  main.appendChild(membersCard);
+
+  // Teams
+  const teamsCard = document.createElement('div'); teamsCard.className='card'; teamsCard.style.marginTop='12px';
+  teamsCard.innerHTML = `<h4 style="margin:0">Teams</h4>`;
+  const tlist = teams.filter(t=>t.leagueId === l.id);
+  if (!tlist.length) teamsCard.innerHTML += '<div class="muted small">No teams yet</div>';
+  else {
+    const table = document.createElement('table'); table.innerHTML = '<thead><tr><th>Team</th><th class="right">Actions</th></tr></thead>';
+    const tbody = document.createElement('tbody');
+    tlist.forEach(t => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td class="team"><div class="logo-pill">${(t.name||'').slice(0,1).toUpperCase()}</div><div style="margin-left:8px">${t.name}</div></td><td class="right"></td>`;
+      tbody.appendChild(tr);
+    });
+    table.appendChild(tbody); teamsCard.appendChild(table);
+  }
+  // Add team
+  const addRow = document.createElement('div'); addRow.className='input-row'; addRow.style.marginTop='10px';
+  const tname = document.createElement('input'); tname.placeholder = 'Team name';
+  const addBtn = document.createElement('button'); addBtn.textContent='Add Team'; addBtn.onclick = ()=>{ const n = tname.value.trim(); if (!n) return alert('team name required'); teams.push({ id: uid(), leagueId: l.id, name: n }); persistAll(); tname.value=''; renderAll(); };
+  addRow.appendChild(tname); addRow.appendChild(addBtn); teamsCard.appendChild(addRow);
+  main.appendChild(teamsCard);
+
+  // Matches list
+  const matchesCard = document.createElement('div'); matchesCard.className='card'; matchesCard.style.marginTop='12px';
+  matchesCard.innerHTML = `<h4 style="margin:0">Matches</h4>`;
+  const mlist = matches.filter(m => m.leagueId === l.id);
+  const mt = document.createElement('table'); mt.innerHTML = '<thead><tr><th>Date</th><th>Home</th><th>Score</th><th>Away</th><th class="right">Actions</th></tr></thead>';
+  const mb = document.createElement('tbody');
+  if (!mlist.length) mb.innerHTML = '<tr><td colspan="5" class="muted small">No matches scheduled.</td></tr>';
+  mlist.forEach(mm => {
+    const home = teams.find(t=>t.id === mm.homeId), away = teams.find(t=>t.id === mm.awayId);
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="small">${mm.date || 'TBD'}</td><td>${home?home.name:'-'}</td><td class="center">${mm.played ? mm.scoreHome + ' - ' + mm.scoreAway : '-'}</td><td>${away?away.name:'-'}</td><td class="right"></td>`;
+    const td = tr.querySelector('td:last-child');
+    if (l.creator === current.username){
+      const del = document.createElement('button'); del.className='danger small'; del.textContent='Remove'; del.onclick = ()=>{ if (confirm('Remove match?')){ matches = matches.filter(x=>x.id !== mm.id); persistAll(); renderAll(); } };
+      td.appendChild(del);
+    }
+    mb.appendChild(tr);
+  });
+  mt.appendChild(mb); matchesCard.appendChild(mt);
+  main.appendChild(matchesCard);
+
+  // Add Match UI (creator only). Dropdown selects, date auto-today but editable.
+  if (l.creator === current.username){
+    const form = document.createElement('div'); form.className='card'; form.style.marginTop='12px';
+    form.innerHTML = '<h4 style="margin:0">Add Match</h4>';
+    const row = document.createElement('div'); row.className='input-row';
+
+    // wrapper + custom-select class ensures white box and black text
+    const wrapperHome = document.createElement('span'); wrapperHome.className = 'select-wrapper';
+    const wrapperAway = document.createElement('span'); wrapperAway.className = 'select-wrapper';
+
+    const selectHome = document.createElement('select'); selectHome.className = 'custom-select';
+    const selectAway = document.createElement('select'); selectAway.className = 'custom-select';
+
+    // populate options
+    teams.filter(t => t.leagueId === l.id).forEach(t => {
+      const o1 = document.createElement('option'); o1.value = t.id; o1.textContent = t.name; selectHome.appendChild(o1);
+      const o2 = document.createElement('option'); o2.value = t.id; o2.textContent = t.name; selectAway.appendChild(o2);
+    });
+    // sensible defaults
+    if (selectHome.options.length) selectHome.selectedIndex = 0;
+    if (selectAway.options.length) selectAway.selectedIndex = selectAway.options.length > 1 ? 1 : 0;
+
+    // preview pills
+    const homePreview = document.createElement('div'); homePreview.className = 'team-selected'; homePreview.style.display = 'inline-block';
+    const awayPreview = document.createElement('div'); awayPreview.className = 'team-selected'; awayPreview.style.display = 'inline-block';
+
+    function updatePreview(sel, preview){
+      const val = sel.value;
+      if (!val){ preview.style.display = 'none'; return; }
+      const team = teams.find(t => t.id === val);
+      if (team){ preview.style.display = 'inline-block'; preview.textContent = team.name; preview.className = 'team-selected'; }
+      else preview.style.display = 'none';
+    }
+
+    // date default to today
+    function todayDateString(){ const d = new Date(); const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
+    const dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.value = todayDateString();
+
+    // score inputs
+    const sH = document.createElement('input'); sH.type = 'number'; sH.placeholder = 'home';
+    const sA = document.createElement('input'); sA.type = 'number'; sA.placeholder = 'away';
+    const addMatchBtn = document.createElement('button'); addMatchBtn.textContent = 'Add Match';
+
+    selectHome.onchange = ()=> updatePreview(selectHome, homePreview);
+    selectAway.onchange = ()=> updatePreview(selectAway, awayPreview);
+    updatePreview(selectHome, homePreview); updatePreview(selectAway, awayPreview);
+
+    addMatchBtn.onclick = ()=>{
+      const homeId = selectHome.value; const awayId = selectAway.value;
+      if (!homeId || !awayId) return alert('Select both teams');
+      if (homeId === awayId) return alert('Home and away must be different');
+      const date = dateInp.value || todayDateString();
+      const shv = (sH.value === '' || sH.value === null) ? null : Number(sH.value);
+      const sav = (sA.value === '' || sA.value === null) ? null : Number(sA.value);
+      matches.push({ id: uid(), leagueId: l.id, homeId, awayId, date, scoreHome: shv === null ? 0 : shv, scoreAway: sav === null ? 0 : sav, played: (shv !== null && sav !== null) });
+      persistAll(); renderAll();
+    };
+
+    // assemble UI: place selects inside wrappers so the ::after arrow shows
+    wrapperHome.appendChild(selectHome);
+    wrapperAway.appendChild(selectAway);
+
+    const left = document.createElement('div'); left.style.display='flex'; left.style.alignItems='center'; left.style.gap='8px';
+    left.appendChild(wrapperHome); left.appendChild(homePreview); left.appendChild(wrapperAway); left.appendChild(awayPreview);
+    row.appendChild(left);
+    row.appendChild(dateInp); row.appendChild(sH); row.appendChild(sA); row.appendChild(addMatchBtn);
+    form.appendChild(row);
+    matchesCard.after(form);
+  }
+
+  // Standings
+  const standings = computeStandings(l.id);
+  const stCard = document.createElement('div'); stCard.className='card'; stCard.style.marginTop='12px';
+  stCard.innerHTML = `<h4 style="margin:0">Standings</h4>`;
+  if (!standings.length) stCard.innerHTML += '<div class="muted small">No standings yet (no played matches).</div>';
+  else {
+    const st = document.createElement('table'); st.innerHTML = '<thead><tr><th>#</th><th>Team</th><th>Pts</th><th>GF</th><th>GA</th><th>GD</th></tr></thead>';
+    const sb = document.createElement('tbody');
+    standings.forEach((s,i)=>{ const tr=document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${s.name}</td><td>${s.pts}</td><td>${s.gf}</td><td>${s.ga}</td><td>${s.gd}</td>`; sb.appendChild(tr); });
+    st.appendChild(sb); stCard.appendChild(st);
+  }
+  main.appendChild(stCard);
+
+  // close league handling
+  const closeBtn = $('btnCloseLeague'); if (closeBtn) closeBtn.onclick = ()=>{ current.openLeagueId = null; save(LS_CURRENT, current); persistAll(); renderAll(); };
+}
+
+/* Auth flows (username + password) */
+async function signupFlow(){
+  const username = prompt('Choose a username (no spaces recommended)');
+  if (!username) return;
+  if (users.find(u=>u.username === username)) return alert('Username taken');
+  const password = prompt('Choose a password');
+  if (!password) return;
+  const club = prompt('Favorite club (optional)');
+  const hash = await sha256Hex(password);
+  users.push({ id: uid(), username, passwordHash: hash, club: club || null });
+  persistAll();
+  current = { username, openLeagueId: null }; save(LS_CURRENT, current); persistAll();
+  alert('Account created & signed in as ' + username);
+  renderAll();
+}
+
+async function loginFlow(){
+  const username = prompt('Username'); if (!username) return;
+  const user = users.find(u=>u.username === username); if (!user) return alert('User not found');
+  const password = prompt('Password'); if (!password) return;
+  const hash = await sha256Hex(password);
+  if (hash !== user.passwordHash) return alert('Incorrect password');
+  current = { username, openLeagueId: current && current.openLeagueId ? current.openLeagueId : null }; save(LS_CURRENT, current); renderAll();
+  alert('Signed in as ' + username);
+}
+
+function logoutFlow(){
+  if (!confirm('Logout?')) return;
+  current = null; save(LS_CURRENT, null); persistAll(); renderAll(); alert('Logged out');
+}
+
+/* Create league */
+$('btnCreateLeague').addEventListener('click', ()=> {
+  if (!current) return alert('Sign in first');
+  const title = prompt('League title'); if (!title) return;
+  const id = uid(); leagues.push({ id, title, creator: current.username }); persistAll();
+  current.openLeagueId = id; save(LS_CURRENT, current); persistAll(); renderAll();
+});
+
+/* Open league by id (creator only since invites removed) */
+$('btnOpenLeague').addEventListener('click', ()=> {
+  if (!current) return alert('Sign in first');
+  const id = prompt('Enter league id'); if (!id) return;
+  const le = leagues.find(l=>l.id === id); if (!le) return alert('League not found');
+  if (le.creator !== current.username) return alert('Only the creator can open their leagues (invites removed).');
+  current.openLeagueId = id; save(LS_CURRENT, current); persistAll(); renderAll();
+});
+
+/* My leagues quick list */
+$('btnMyLeagues').addEventListener('click', ()=> {
+  if (!current) return alert('Sign in first');
+  const my = leagues.filter(l => l.creator === current.username);
+  if (!my.length) return alert('You have not created any leagues');
+  alert('Your leagues:\\n' + my.map(m => `${m.title} (id: ${m.id})`).join('\\n'));
+});
+
+/* Quick actions */
+$('btnAddTeamQuick').addEventListener('click', ()=> {
+  if (!current || !current.openLeagueId) return alert('Open a league first');
+  const name = prompt('Team name'); if (!name) return; teams.push({ id: uid(), leagueId: current.openLeagueId, name }); persistAll(); renderAll();
+});
+$('btnAddMatchQuick').addEventListener('click', ()=> {
+  if (!current || !current.openLeagueId) return alert('Open a league first');
+  const l = leagues.find(x=>x.id === current.openLeagueId); if (l.creator !== current.username) return alert('Only creator can add matches');
+  const t = teams.filter(x=>x.leagueId === l.id); if (t.length < 2) return alert('Add teams first');
+  const home = prompt('Home team id:\\n' + t.map(tt=>`${tt.id}: ${tt.name}`).join('\\n')); const away = prompt('Away team id:'); const date = prompt('Date (YYYY-MM-DD) (leave blank = today)'); const sh = prompt('Home score (leave blank if not played)'); const sa = prompt('Away score');
+  const shv = (sh === '' || sh === null) ? null : Number(sh); const sav = (sa === '' || sa === null) ? null : Number(sa);
+  const dateVal = date || (new Date()).toISOString().slice(0,10);
+  matches.push({ id: uid(), leagueId: l.id, homeId: home, awayId: away, date: dateVal, scoreHome: shv === null ? 0 : shv, scoreAway: sav === null ? 0 : sav, played: (shv !== null && sav !== null) });
+  persistAll(); renderAll();
+});
+
+/* Icon wiring */
+$('iconSignUp').addEventListener('click', signupFlow);
+$('iconLogIn').addEventListener('click', loginFlow);
+$('iconLogout').addEventListener('click', logoutFlow);
+
+/* Theme toggle wiring */
+$('themeToggle').addEventListener('click', ()=> {
+  theme = (theme === 'light') ? 'dark' : 'light';
+  save(LS_THEME, theme);
+  applyTheme();
+  renderAll();
+});
+
+/* Demo seed (optional) */
+function seedDemo(){
+  if (users.length === 0 && leagues.length === 0){
+    sha256Hex('demo').then(h=>{
+      users.push({ id: uid(), username:'bahrawy', passwordHash:h, club:'Bah Club' });
+      users.push({ id: uid(), username:'omar', passwordHash:h, club:'Omar FC' });
+      const lid = uid(); leagues.push({ id: lid, title:'Demo League', creator:'bahrawy' });
+      teams.push({ id: uid(), leagueId: lid, name: 'Red United' }); teams.push({ id: uid(), leagueId: lid, name: 'Blue City' });
+      matches.push({ id: uid(), leagueId: lid, homeId: teams[0].id, awayId: teams[1].id, date: (new Date()).toISOString().slice(0,10), scoreHome:2, scoreAway:1, played:true });
+      persistAll(); renderAll();
+    });
+  }
+}
+seedDemo();
+
+/* Initial render */
+renderAll();
+
+/* Expose debug (optional) */
+window._fifaBlackSilver = { users, leagues, teams, matches, current, persistAll, reload: renderAll };
+</script>
+</body>
+</html>
