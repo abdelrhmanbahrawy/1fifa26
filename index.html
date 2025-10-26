@@ -131,6 +131,9 @@ select.custom-select:focus{ outline:none; box-shadow:0 4px 14px rgba(0,0,0,0.12)
 
 /* small helper accessibility */
 .visually-hidden{position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;}
+/* tiny icons next to team rows */
+.team-actions { display:flex; gap:6px; align-items:center; justify-content:flex-end; }
+.team-actions button{ padding:6px 8px; font-size:12px; border-radius:8px; }
 </style>
 </head>
 <body>
@@ -216,7 +219,7 @@ select.custom-select:focus{ outline:none; box-shadow:0 4px 14px rgba(0,0,0,0.12)
 
       <div class="grid">
         <section>
-          <div id="notice" class="muted-block small" style="margin-top:12px">Sign up and create or open a league to start. Date auto-fills to today when adding a match.</div>
+          <div id="notice" class="muted-block small" style="margin-top:12px">Sign up and create or open a league to start. Date auto-fills to today when adding a match. Only the league creator can edit teams and matches.</div>
           <div id="mainContent"></div>
         </section>
 
@@ -247,15 +250,11 @@ select.custom-select:focus{ outline:none; box-shadow:0 4px 14px rgba(0,0,0,0.12)
 
 <script>
 /* ===========================================================
-   Local league app JS
-   - Black/silver dark theme + gray/blue light mode (persisted)
-   - Username + password signup/login (SHA-256 hashed)
-   - No invites (creator-only leagues)
-   - Add match: choose teams from dropdowns (no typing)
-   - Date auto-fills to today by default but editable
-   - Team selection shows black & white pill
-   - Scrollbar is white & black only
-   - SELECTs use class "custom-select" to style white box + black text
+   Local league app JS (updated)
+   - Adds team Edit / Remove
+   - League table always visible (Played / W / D / L / Pts)
+   - Deleting a team removes its matches (confirm)
+   - Only league creator can edit/remove teams & add/remove matches
    =========================================================== */
 
 /* Storage keys */
@@ -293,40 +292,23 @@ function persistAll(){ save(LS_USERS, users); save(LS_LEAGUES, leagues); save(LS
 
 /* Apply theme */
 function applyTheme(){ if (theme === 'light') document.body.classList.add('light-mode'); else document.body.classList.remove('light-mode'); updateScrollbarColors(); }
-function updateScrollbarColors(){
-  if (theme === 'light'){
-    document.documentElement.style.setProperty('scrollbar-color', 'black white');
-  } else {
-    document.documentElement.style.setProperty('scrollbar-color', 'white black');
-  }
-}
+function updateScrollbarColors(){ if (theme === 'light'){ document.documentElement.style.setProperty('scrollbar-color', 'black white'); } else { document.documentElement.style.setProperty('scrollbar-color', 'white black'); } }
 applyTheme();
 
 /* UI Auth icons visibility */
-function updateAuthIcons(){
-  if (!current){
-    $('iconSignUp').style.display = 'inline-flex';
-    $('iconLogIn').style.display = 'inline-flex';
-    $('iconLogout').style.display = 'none';
-    $('loggedAs').textContent = 'Not signed in';
-  } else {
-    $('iconSignUp').style.display = 'none';
-    $('iconLogIn').style.display = 'none';
-    $('iconLogout').style.display = 'inline-flex';
-    $('loggedAs').textContent = current.username;
-  }
-}
+function updateAuthIcons(){ if (!current){ $('iconSignUp').style.display = 'inline-flex'; $('iconLogIn').style.display = 'inline-flex'; $('iconLogout').style.display = 'none'; $('loggedAs').textContent = 'Not signed in'; } else { $('iconSignUp').style.display = 'none'; $('iconLogIn').style.display = 'none'; $('iconLogout').style.display = 'inline-flex'; $('loggedAs').textContent = current.username; } }
 
 /* Utility: current league */
 function currentLeague(){ return current && current.openLeagueId ? leagues.find(l => l.id === current.openLeagueId) : null; }
 
-/* Compute standings */
+/* Compute standings + return per-team stats (played, w,d,l,pts,gf,ga,gd) */
 function computeStandings(leagueId){
   const t = teams.filter(x=>x.leagueId === leagueId);
-  const map = {}; t.forEach(team => map[team.id] = { id: team.id, name: team.name, w:0,d:0,l:0,pts:0,gf:0,ga:0,gd:0 });
+  const map = {}; t.forEach(team => map[team.id] = { id: team.id, name: team.name, played:0, w:0,d:0,l:0,pts:0,gf:0,ga:0,gd:0 });
   matches.filter(m => m.leagueId === leagueId && m.played).forEach(m => {
     const h = map[m.homeId], a = map[m.awayId]; if (!h || !a) return;
     h.gf += m.scoreHome; h.ga += m.scoreAway; a.gf += m.scoreAway; a.ga += m.scoreHome;
+    h.played += 1; a.played += 1;
     if (m.scoreHome > m.scoreAway){ h.w++; h.pts += 3; a.l++; }
     else if (m.scoreHome < m.scoreAway){ a.w++; a.pts += 3; h.l++; }
     else { h.d++; a.d++; h.pts++; a.pts++; }
@@ -338,7 +320,6 @@ function computeStandings(leagueId){
 
 /* Renders */
 function renderAll(){
-  // reload state from storage (multi-tab friendly)
   users = load(LS_USERS, users);
   leagues = load(LS_LEAGUES, leagues);
   teams = load(LS_TEAMS, teams);
@@ -387,17 +368,17 @@ function renderContent(){
     return;
   }
 
-  // League header
+  /* League header */
   const headerCard = document.createElement('div'); headerCard.className='card';
   headerCard.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center"><div><h3 style="margin:0">${l.title}</h3><div class="muted small">Creator: ${l.creator}</div></div><div><button id="btnCloseLeague" class="small ghost">Close</button></div></div>`;
   main.appendChild(headerCard);
 
-  // Members (creator only)
+  /* Members */
   const membersCard = document.createElement('div'); membersCard.className='card'; membersCard.style.marginTop='12px';
   membersCard.innerHTML = `<h4 style="margin:0">Members</h4><div class="muted small">${l.creator}</div>`;
   main.appendChild(membersCard);
 
-  // Teams
+  /* Teams (with Edit / Remove buttons for creator) */
   const teamsCard = document.createElement('div'); teamsCard.className='card'; teamsCard.style.marginTop='12px';
   teamsCard.innerHTML = `<h4 style="margin:0">Teams</h4>`;
   const tlist = teams.filter(t=>t.leagueId === l.id);
@@ -407,19 +388,60 @@ function renderContent(){
     const tbody = document.createElement('tbody');
     tlist.forEach(t => {
       const tr = document.createElement('tr');
-      tr.innerHTML = `<td class="team"><div class="logo-pill">${(t.name||'').slice(0,1).toUpperCase()}</div><div style="margin-left:8px">${t.name}</div></td><td class="right"></td>`;
+      const actionsTd = document.createElement('td'); actionsTd.className = 'right';
+      const actions = document.createElement('div'); actions.className = 'team-actions';
+      // Edit (only for creator)
+      const editBtn = document.createElement('button'); editBtn.className='small ghost'; editBtn.textContent='Edit';
+      editBtn.onclick = ()=> {
+        if (l.creator !== current.username) return alert('Only the league creator can edit teams');
+        const newName = prompt('Edit team name', t.name);
+        if (newName === null) return;
+        const n = newName.trim();
+        if (!n) return alert('Name cannot be empty');
+        t.name = n; persistAll(); renderAll();
+      };
+      // Remove (only for creator)
+      const removeBtn = document.createElement('button'); removeBtn.className='small danger'; removeBtn.textContent='Remove';
+      removeBtn.onclick = ()=> {
+        if (l.creator !== current.username) return alert('Only the league creator can remove teams');
+        if (!confirm(`Remove team "${t.name}" and all matches containing it? This cannot be undone.`)) return;
+        // remove matches referencing this team
+        matches = matches.filter(m => m.homeId !== t.id && m.awayId !== t.id);
+        // remove team
+        teams = teams.filter(tt => tt.id !== t.id);
+        persistAll(); renderAll();
+      };
+      // only show buttons if creator, else disabled ghost
+      if (l.creator === current.username){
+        actions.appendChild(editBtn); actions.appendChild(removeBtn);
+      } else {
+        const disabledEdit = document.createElement('button'); disabledEdit.className='small ghost'; disabledEdit.textContent='Edit'; disabledEdit.disabled = true;
+        const disabledRemove = document.createElement('button'); disabledRemove.className='small ghost'; disabledRemove.textContent='Remove'; disabledRemove.disabled = true;
+        actions.appendChild(disabledEdit); actions.appendChild(disabledRemove);
+      }
+      actionsTd.appendChild(actions);
+
+      tr.innerHTML = `<td class="team"><div class="logo-pill">${(t.name||'').slice(0,1).toUpperCase()}</div><div style="margin-left:8px">${t.name}</div></td>`;
+      tr.appendChild(actionsTd);
       tbody.appendChild(tr);
     });
     table.appendChild(tbody); teamsCard.appendChild(table);
   }
-  // Add team
+  // Add team form (creator only)
   const addRow = document.createElement('div'); addRow.className='input-row'; addRow.style.marginTop='10px';
   const tname = document.createElement('input'); tname.placeholder = 'Team name';
-  const addBtn = document.createElement('button'); addBtn.textContent='Add Team'; addBtn.onclick = ()=>{ const n = tname.value.trim(); if (!n) return alert('team name required'); teams.push({ id: uid(), leagueId: l.id, name: n }); persistAll(); tname.value=''; renderAll(); };
+  const addBtn = document.createElement('button'); addBtn.textContent='Add Team';
+  addBtn.onclick = ()=> {
+    if (!current) return alert('Sign in first');
+    if (l.creator !== current.username) return alert('Only the creator can add teams');
+    const n = tname.value.trim(); if (!n) return alert('team name required');
+    teams.push({ id: uid(), leagueId: l.id, name: n });
+    persistAll(); tname.value=''; renderAll();
+  };
   addRow.appendChild(tname); addRow.appendChild(addBtn); teamsCard.appendChild(addRow);
   main.appendChild(teamsCard);
 
-  // Matches list
+  /* Matches list */
   const matchesCard = document.createElement('div'); matchesCard.className='card'; matchesCard.style.marginTop='12px';
   matchesCard.innerHTML = `<h4 style="margin:0">Matches</h4>`;
   const mlist = matches.filter(m => m.leagueId === l.id);
@@ -440,13 +462,12 @@ function renderContent(){
   mt.appendChild(mb); matchesCard.appendChild(mt);
   main.appendChild(matchesCard);
 
-  // Add Match UI (creator only). Dropdown selects, date auto-today but editable.
+  /* Add Match UI (creator only). Dropdown selects, date auto-today but editable. */
   if (l.creator === current.username){
     const form = document.createElement('div'); form.className='card'; form.style.marginTop='12px';
     form.innerHTML = '<h4 style="margin:0">Add Match</h4>';
     const row = document.createElement('div'); row.className='input-row';
 
-    // wrapper + custom-select class ensures white box and black text
     const wrapperHome = document.createElement('span'); wrapperHome.className = 'select-wrapper';
     const wrapperAway = document.createElement('span'); wrapperAway.className = 'select-wrapper';
 
@@ -458,11 +479,10 @@ function renderContent(){
       const o1 = document.createElement('option'); o1.value = t.id; o1.textContent = t.name; selectHome.appendChild(o1);
       const o2 = document.createElement('option'); o2.value = t.id; o2.textContent = t.name; selectAway.appendChild(o2);
     });
-    // sensible defaults
+
     if (selectHome.options.length) selectHome.selectedIndex = 0;
     if (selectAway.options.length) selectAway.selectedIndex = selectAway.options.length > 1 ? 1 : 0;
 
-    // preview pills
     const homePreview = document.createElement('div'); homePreview.className = 'team-selected'; homePreview.style.display = 'inline-block';
     const awayPreview = document.createElement('div'); awayPreview.className = 'team-selected'; awayPreview.style.display = 'inline-block';
 
@@ -474,11 +494,9 @@ function renderContent(){
       else preview.style.display = 'none';
     }
 
-    // date default to today
     function todayDateString(){ const d = new Date(); const y = d.getFullYear(); const m = String(d.getMonth()+1).padStart(2,'0'); const day = String(d.getDate()).padStart(2,'0'); return `${y}-${m}-${day}`; }
     const dateInp = document.createElement('input'); dateInp.type = 'date'; dateInp.value = todayDateString();
 
-    // score inputs
     const sH = document.createElement('input'); sH.type = 'number'; sH.placeholder = 'home';
     const sA = document.createElement('input'); sA.type = 'number'; sA.placeholder = 'away';
     const addMatchBtn = document.createElement('button'); addMatchBtn.textContent = 'Add Match';
@@ -498,9 +516,7 @@ function renderContent(){
       persistAll(); renderAll();
     };
 
-    // assemble UI: place selects inside wrappers so the ::after arrow shows
-    wrapperHome.appendChild(selectHome);
-    wrapperAway.appendChild(selectAway);
+    wrapperHome.appendChild(selectHome); wrapperAway.appendChild(selectAway);
 
     const left = document.createElement('div'); left.style.display='flex'; left.style.alignItems='center'; left.style.gap='8px';
     left.appendChild(wrapperHome); left.appendChild(homePreview); left.appendChild(wrapperAway); left.appendChild(awayPreview);
@@ -510,24 +526,29 @@ function renderContent(){
     matchesCard.after(form);
   }
 
-  // Standings
+  /* Standings (league table) - always visible */
   const standings = computeStandings(l.id);
   const stCard = document.createElement('div'); stCard.className='card'; stCard.style.marginTop='12px';
-  stCard.innerHTML = `<h4 style="margin:0">Standings</h4>`;
+  stCard.innerHTML = `<h4 style="margin:0">League Table</h4>`;
   if (!standings.length) stCard.innerHTML += '<div class="muted small">No standings yet (no played matches).</div>';
   else {
-    const st = document.createElement('table'); st.innerHTML = '<thead><tr><th>#</th><th>Team</th><th>Pts</th><th>GF</th><th>GA</th><th>GD</th></tr></thead>';
+    const st = document.createElement('table');
+    st.innerHTML = '<thead><tr><th>#</th><th>Team</th><th class="center">Played</th><th class="center">W</th><th class="center">D</th><th class="center">L</th><th class="center">Pts</th><th class="center">GF</th><th class="center">GA</th><th class="center">GD</th></tr></thead>';
     const sb = document.createElement('tbody');
-    standings.forEach((s,i)=>{ const tr=document.createElement('tr'); tr.innerHTML = `<td>${i+1}</td><td>${s.name}</td><td>${s.pts}</td><td>${s.gf}</td><td>${s.ga}</td><td>${s.gd}</td>`; sb.appendChild(tr); });
+    standings.forEach((s,i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `<td>${i+1}</td><td>${s.name}</td><td class="center">${s.played}</td><td class="center">${s.w}</td><td class="center">${s.d}</td><td class="center">${s.l}</td><td class="center">${s.pts}</td><td class="center">${s.gf}</td><td class="center">${s.ga}</td><td class="center">${s.gd}</td>`;
+      sb.appendChild(tr);
+    });
     st.appendChild(sb); stCard.appendChild(st);
   }
   main.appendChild(stCard);
 
-  // close league handling
+  /* close league button */
   const closeBtn = $('btnCloseLeague'); if (closeBtn) closeBtn.onclick = ()=>{ current.openLeagueId = null; save(LS_CURRENT, current); persistAll(); renderAll(); };
 }
 
-/* Auth flows (username + password) */
+/* Auth flows */
 async function signupFlow(){
   const username = prompt('Choose a username (no spaces recommended)');
   if (!username) return;
@@ -566,7 +587,7 @@ $('btnCreateLeague').addEventListener('click', ()=> {
   current.openLeagueId = id; save(LS_CURRENT, current); persistAll(); renderAll();
 });
 
-/* Open league by id (creator only since invites removed) */
+/* Open league */
 $('btnOpenLeague').addEventListener('click', ()=> {
   if (!current) return alert('Sign in first');
   const id = prompt('Enter league id'); if (!id) return;
@@ -586,7 +607,9 @@ $('btnMyLeagues').addEventListener('click', ()=> {
 /* Quick actions */
 $('btnAddTeamQuick').addEventListener('click', ()=> {
   if (!current || !current.openLeagueId) return alert('Open a league first');
-  const name = prompt('Team name'); if (!name) return; teams.push({ id: uid(), leagueId: current.openLeagueId, name }); persistAll(); renderAll();
+  const l = leagues.find(x=>x.id === current.openLeagueId);
+  if (l.creator !== current.username) return alert('Only creator can add teams');
+  const name = prompt('Team name'); if (!name) return; teams.push({ id: uid(), leagueId: l.id, name }); persistAll(); renderAll();
 });
 $('btnAddMatchQuick').addEventListener('click', ()=> {
   if (!current || !current.openLeagueId) return alert('Open a league first');
